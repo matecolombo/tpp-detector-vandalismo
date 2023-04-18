@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-def getOpticalFlowFromCamera():
+def getOpticalFlowFromCamera(num_frames):
     """Calculate dense optical flow from the camera feed
     Returns:
         flows_x: the optical flow at x-axis, with the shape of [frames,height,width,channel]
@@ -12,7 +12,6 @@ def getOpticalFlowFromCamera():
     # Open the camera
     cap = cv2.VideoCapture(0)
     i = 0
-    num_frames = 50
     while i < num_frames:
         # Capture frame-by-frame
         ret, frame = cap.read()
