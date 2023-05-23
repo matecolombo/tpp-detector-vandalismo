@@ -1,7 +1,8 @@
 import numpy as np
 import cv2
 
-def getOpticalFlowFromCamera(num_frames):
+
+def getOpticalFlowFromCamera(duration):
     """Calculate dense optical flow from the camera feed
     Returns:
         flows_x: the optical flow at x-axis, with the shape of [frames,height,width,channel]
@@ -11,6 +12,13 @@ def getOpticalFlowFromCamera(num_frames):
     gray_video = []
     # Open the camera
     cap = cv2.VideoCapture(0)
+
+    # Obtener la velocidad de cuadros por segundo
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # Calcular la cantidad de cuadros necesarios
+    num_frames = int(fps * duration)
+
     i = 0
     while i < num_frames:
         # Capture frame-by-frame
@@ -24,7 +32,7 @@ def getOpticalFlowFromCamera(num_frames):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-        i+=1
+        i += 1
 
     # Release the camera and destroy all windows
     cap.release()
@@ -32,9 +40,9 @@ def getOpticalFlowFromCamera(num_frames):
 
     flows = []
     for i in range(0, len(gray_video) - 1):
-
         # calculate optical flow between each pair of frames
-        flow = cv2.calcOpticalFlowFarneback(gray_video[i], gray_video[i + 1], None, 0.5, 3, 15, 3, 5, 1.2, cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
+        flow = cv2.calcOpticalFlowFarneback(gray_video[i], gray_video[i + 1], None, 0.5, 3, 15, 3, 5, 1.2,
+                                            cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
         # subtract the mean in order to eliminate the movement of camera
         flow[..., 0] -= np.mean(flow[..., 0])
         flow[..., 1] -= np.mean(flow[..., 1])
@@ -48,3 +56,8 @@ def getOpticalFlowFromCamera(num_frames):
     flows.append(np.zeros((224, 224, 2)))
 
     return np.array(flows, dtype=np.float32)
+
+
+duration = 5
+preprocess_video = getOpticalFlowFromCamera(duration)
+print(preprocess_video.shape)
