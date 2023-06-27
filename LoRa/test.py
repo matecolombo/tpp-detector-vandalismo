@@ -39,18 +39,19 @@ def main():
     lora = controller.add_transceiver(sx127x.SX127x(name = 'LoRa'),
                                       pin_id_ss = config_lora.Controller.PIN_ID_FOR_LORA_SS,
                                       pin_id_RxDone = config_lora.Controller.PIN_ID_FOR_LORA_DIO0)
-    print('lora', lora)
+    #print('lora', lora)
     
 
     # LoRaDumpRegisters.dumpRegisters(lora)
     # LoRaSender.send(lora)    
-    # LoRaReceiver.receive(lora)
+    # LoRaDuplexCallback.receive(lora)
     # LoRaSetSpread.setSpread(lora)
     # LoRaSetSyncWord.setSyncWord(lora)
     # LoRaReceiverCallback.receiveCallback(lora)
     # LoRaDuplex.duplex(lora)
-    LoRaDuplexCallback.sendMessage(lora, 'hola')
-    lora.blink_led(times = 3)
+    #LoRaDuplexCallback.receive(lora)
+    LoRaDuplexCallback.sendMessage(lora, 'Hola')
+    #lora.blink_led(times = 6)
     # LoRaPingPong.ping_pong(lora)
 
     
