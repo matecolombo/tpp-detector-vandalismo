@@ -392,3 +392,4 @@ class SX127x:
         gc.collect()
         if config_lora.IS_MICROPYTHON:
             print('[Memory - free: {}   allocated: {}]'.format(gc.mem_free(), gc.mem_alloc()))
+            
