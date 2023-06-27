@@ -51,4 +51,3 @@ def on_receive(lora, payload):
     except Exception as e:
         print(e)
     print("with RSSI {}\n".format(rssi))
-    

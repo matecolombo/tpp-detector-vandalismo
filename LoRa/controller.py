@@ -56,6 +56,7 @@ class Controller:
         transceiver.pin_ss = self.prepare_pin(pin_id_ss)
         transceiver.pin_RxDone = self.prepare_irq_pin(pin_id_RxDone)
         #transceiver.pin_RxTimeout = self.prepare_irq_pin(pin_id_RxTimeout)
+        
         #transceiver.pin_ValidHeader = self.prepare_irq_pin(pin_id_ValidHeader)
         #transceiver.pin_CadDone = self.prepare_irq_pin(pin_id_CadDone)
         #transceiver.pin_CadDetected = self.prepare_irq_pin(pin_id_CadDetected)

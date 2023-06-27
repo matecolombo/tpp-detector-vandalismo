@@ -1,6 +1,7 @@
 from time import sleep 
 import gc
 import config_lora
+from machine import Pin
 
 
 PA_OUTPUT_RFO_PIN = 0
@@ -94,8 +95,8 @@ class SX127x:
         # check version
         version = self.readRegister(REG_VERSION)
         print(version)
-        if version != 0x12:
-            raise Exception('Invalid version.')
+        #if version != 0x12:
+            #raise Exception('Invalid version.')
             
         
         # put in LoRa and sleep mode
@@ -304,15 +305,14 @@ class SX127x:
        
         
     def onReceive(self, callback):
-        self._onReceive = callback        
-        
+        self._onReceive = callback
+
         if self.pin_RxDone:
             if callback:
                 self.writeRegister(REG_DIO_MAPPING_1, 0x00)
-                self.pin_RxDone.set_handler_for_irq_on_rising_edge(handler = self.handleOnReceive)
+                self.pin_RxDone.irq(trigger=Pin.IRQ_RISING, handler=self.handleOnReceive)
             else:
-                self.pin_RxDone.detach_irq()
-        
+                self.pin_RxDone.irq(handler=None)
 
     def receive(self, size = 0):
         self.implicitHeaderMode(size > 0)
@@ -392,4 +392,3 @@ class SX127x:
         gc.collect()
         if config_lora.IS_MICROPYTHON:
             print('[Memory - free: {}   allocated: {}]'.format(gc.mem_free(), gc.mem_alloc()))
-            

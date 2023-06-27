@@ -19,17 +19,15 @@ cs_pin = Pin(8, Pin.OUT)
 #    print(e)
     
 
-
 class Controller(controller.Controller):
     
     # BOARD config
-    ON_BOARD_LED_PIN_NO = 25 # RPi's on-board LED
+    ON_BOARD_LED_PIN_NO = 'LED' # RPi's on-board LED
     ON_BOARD_LED_HIGH_IS_ON = True
     #GPIO_PINS = (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,)
 
     
     # LoRa config
-
     PIN_ID_FOR_LORA_RESET = None
 
     PIN_ID_FOR_LORA_SS = 17
@@ -56,28 +54,17 @@ class Controller(controller.Controller):
          
     def prepare_pin(self, pin_id, in_out=Pin.OUT):
         pin = Pin(pin_id, mode=in_out)
-
-        if in_out == Pin.OUT:
-            new_pin = controller.Controller.Mock()
-            new_pin.pin_id = pin_id
-            new_pin.low = lambda: pin.value(0)
-            new_pin.high = lambda: pin.value(1)
-        else:
-            new_pin = controller.Controller.Mock()
-            new_pin.pin_id = pin_id
-            new_pin.value = lambda: pin.value()
-
-        return new_pin
+        return pin
 
             
 
-    def prepare_irq_pin(self, pin_id): 
-        pin = self.prepare_pin(pin_id, Pin.IN) 
-        if pin:       
-            pin.set_handler_for_irq_on_rising_edge = \
-                lambda handler: pin.irq(trigger=Pin.IRQ_RISING, handler=handler)  
-            pin.detach_irq = lambda: pin.irq(trigger=0) 
+    def prepare_irq_pin(self, pin_id):
+        pin = Pin(pin_id, Pin.IN)
+        if pin:
+            irq_handler = lambda pin: print("Interrupt occurred on pin", pin.id())
+            pin.irq(trigger=Pin.IRQ_RISING, handler=irq_handler)
             return pin
+
 
 
             
@@ -88,31 +75,31 @@ class Controller(controller.Controller):
         MISO = 20
         spi = SPI(0, baudrate=10000000, sck=Pin(SCK), mosi=Pin(MOSI), miso=Pin(MISO))
         spi.init()
-
         return spi
             
     # https://www.raspberrypi.org/documentation/hardware/raspberrypi/spi/README.md
     # https://www.raspberrypi.org/forums/viewtopic.php?f=44&t=19489
-    def prepare_spi(self, spi): 
-        if spi:            
-            new_spi = Controller.Mock()
+    def prepare_spi(self, spi):
+        class CustomSPI:
+            def __init__(self, spi):
+                self.spi = spi
 
-            def transfer(pin_ss, address, value=0x00):
+            def transfer(self, pin_ss, address, value=0x00):
                 response = bytearray(1)
 
                 pin_ss.low()
-                spi.write(bytes([address]))
-                spi.readinto(response)
+                self.spi.write(bytes([address]))
+                self.spi.readinto(response)
                 pin_ss.high()
 
                 return response
-            
-            new_spi.transfer = transfer
+
+        if spi:
+            new_spi = CustomSPI(spi)
             return new_spi
+
 
         
     def __exit__(self): 
-        Pin.GPIO.cleanup()
+        #Pin.GPIO.cleanup()
         self.spi.deinit()
-
-        
