@@ -1,12 +1,12 @@
 from time import sleep
-
+from machine import Pin, SPI
             
 class Controller:
 
-    class Mock:
-        pass        
+    #class Mock:
+      #  pass        
 
-    ON_BOARD_LED_PIN_NO = 25
+    ON_BOARD_LED_PIN_NO = 'LED'
     ON_BOARD_LED_HIGH_IS_ON = True
     GPIO_PINS = []
                  
@@ -56,7 +56,6 @@ class Controller:
         transceiver.pin_ss = self.prepare_pin(pin_id_ss)
         transceiver.pin_RxDone = self.prepare_irq_pin(pin_id_RxDone)
         #transceiver.pin_RxTimeout = self.prepare_irq_pin(pin_id_RxTimeout)
-        
         #transceiver.pin_ValidHeader = self.prepare_irq_pin(pin_id_ValidHeader)
         #transceiver.pin_CadDone = self.prepare_irq_pin(pin_id_CadDone)
         #transceiver.pin_CadDetected = self.prepare_irq_pin(pin_id_CadDetected)
@@ -67,41 +66,45 @@ class Controller:
         return transceiver
         
                  
-    def prepare_pin(self, pin_id, in_out = None):
-        reason = '''
-            # a pin should provide:
-            # .pin_id
-            # .low()
-            # .high()
-            # .value()  # read input.
-            # .irq()    # (ESP8266/ESP32 only) ref to the irq function of real pin object.
-        '''
-        raise NotImplementedError(reason)
-        
+    def prepare_pin(self, pin_id, in_out=Pin.OUT):
+        pin = Pin(pin_id, mode=in_out)
+        return new_pin
 
     def prepare_irq_pin(self, pin_id):
-        reason = '''
-            # a irq_pin should provide:
-            # .set_handler_for_irq_on_rising_edge()  # to set trigger and handler.
-            # .detach_irq()
-        '''
-        raise NotImplementedError(reason)
+        pin = self.prepare_pin(pin_id, Pin.IN)
+        if pin:
+            pin.set_handler_for_irq_on_rising_edge = lambda handler: pin.irq(trigger=Pin.IRQ_RISING, handler=handler)
+            pin.detach_irq = lambda: pin.irq(trigger=0)
+            return pin
         
         
-    def get_spi(self): 
-        reason = '''
-            # initialize SPI interface 
-        '''
-        raise NotImplementedError(reason)
+    def get_spi(self):
+        MOSI = 19
+        SCK = 18
+        MISO = 20
+        spi = SPI(0, baudrate=10000000, sck=Pin(SCK), mosi=Pin(MOSI), miso=Pin(MISO))
+        spi.init()
+        print(spi)
+        return spi
+    
         
+    def prepare_spi(self, spi):
         
-    def prepare_spi(self, spi): 
-        reason = '''
-            # a spi should provide: 
-            # .close()
-            # .transfer(pin_ss, address, value = 0x00) 
-        '''
-        raise NotImplementedError(reason)
+        if spi:
+            new_spi = spi
+
+            def transfer(pin_ss, address, value=0x00):
+                response = bytearray(1)
+
+                pin_ss.low()
+                spi.write(bytes([address]))
+                spi.readinto(response)
+                pin_ss.high()
+
+                return response
+
+            new_spi.transfer = transfer
+            return new_spi
 
 
     def led_on(self, on = True):
