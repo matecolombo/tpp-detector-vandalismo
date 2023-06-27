@@ -19,6 +19,7 @@ cs_pin = Pin(8, Pin.OUT)
 #    print(e)
     
 
+
 class Controller(controller.Controller):
     
     # BOARD config
@@ -64,9 +65,6 @@ class Controller(controller.Controller):
             irq_handler = lambda pin: print("Interrupt occurred on pin", pin.id())
             pin.irq(trigger=Pin.IRQ_RISING, handler=irq_handler)
             return pin
-
-
-
             
     
     def get_spi(self):
@@ -103,3 +101,5 @@ class Controller(controller.Controller):
     def __exit__(self): 
         #Pin.GPIO.cleanup()
         self.spi.deinit()
+
+        
