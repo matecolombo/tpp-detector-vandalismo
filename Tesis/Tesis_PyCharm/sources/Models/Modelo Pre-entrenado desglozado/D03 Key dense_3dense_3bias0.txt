@@ -1,0 +1,7 @@
+Key: dense_3/dense_3/bias:0
+Value shape: (2,)
+Value:
+[-0.0230646   0.02306521]
+Flattened value shape: (1, 2)
+Flattened value:
+[[-0.0230646   0.02306521]]
