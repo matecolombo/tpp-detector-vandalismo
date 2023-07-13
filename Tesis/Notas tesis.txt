@@ -1,0 +1,60 @@
+https://arxiv.org/pdf/2109.08941v1.pdf
+
+
+
+Audio and Video
+
+Nam et al [41]
+41] J. Nam, M. Alghoniemy, and A. H. Tewfik. Audio-visual content-based violent
+scene characterization. In Image Processing, 1998. ICIP 98. Proceedings. 1998
+International Conference on, volume 1, pages 353–357. IEEE, 1998.
+
+Gong et al. [27][27] Y. Gong, W. Wang, S. Jiang, Q. Huang, and W. Gao. Detecting violent scenes
+in movies by auditory and visual cues. In Advances in Multimedia Information
+Processing-PCM 2008, pages 317–326. Springer, 2008.
+Lin and Wang [38]
+[38] J. Lin and W. Wang. Weakly-supervised violence detection in movies with audio
+and video based co-training. In Advances in Multimedia Information ProcessingPCM 2009, pages 930–935. Springer, 2009.
+Hofmann[30]
+[30] T. Hofmann. Unsupervised learning by probabilistic latent semantic analysis. Machine learning, 42(1-2):177–196, 2001.
+Dempster et al. [20]
+[20] A. P. Dempster, N. M. Laird, and D. B. Rubin. Maximum likelihood from incomplete data via the em algorithm. Journal of the royal statistical society. Series B
+(methodological), pages 1–38, 1977
+
+Audio
+
+Cheng et al. [11]
+[11] W.-H. Cheng, W.-T. Chu, and J.-L. Wu. Semantic context detection based on
+hierarchical audio models. In Proceedings of the 5th ACM SIGMM international
+workshop on Multimedia information retrieval, pages 109–115. ACM, 2003.
+Datta et al. [14]
+[14] A. Datta, M. Shah, and N. D. V. Lobo. Person-on-person violence detection in video
+data. In Pattern Recognition, 2002. Proceedings. 16th International Conference on,
+volume 1, pages 433–438. IEEE, 2002.
+
+
+
+Video
+Clarin et al. [12]
+[12] C. Clarin, J. Dionisio, M. Echavez, and P. Naval. Dove: Detection of movie violence
+using motion intensity analysis on skin and blood. PCSC, 6:150–156, 2005.
+
+Nievas et al. [42] 
+STIP - Laptev [37]
+[37] I. Laptev. On space-time interest points. International Journal of Computer Vision,
+64(2-3):107–123, 2005.
+MoSIFT - Chen and Hauptmann [10]
+[10] M.-y. Chen and A. Hauptmann. Mosift: Recognizing human actions in surveillance
+videos. 2009.
+Deniz et al. [21]
+[21] O. Deniz, I. Serrano, G. Bueno, and T. Kim. Fast violence detection in video.
+In The 9th International Conference on Computer Vision Theory and Applications
+(VISAPP), 2014
+Hassner et al. [28] 
+[28] T. Hassner, Y. Itcher, and O. Kliper-Gross. Violent flows: Real-time detection of
+violent crowd behavior. In Computer Vision and Pattern Recognition Workshops
+(CVPRW), 2012 IEEE Computer Society Conference on, pages 1–6. IEEE, 2012.
+Demarty et al. [16]
+[16] C.-H. Demarty, C. Penet, G. Gravier, and M. Soleymani. A benchmarking campaign
+for the multimodal detection of violent scenes in movies. In Computer Vision–ECCV
+2012. Workshops and Demonstrations, pages 416–425. Springer, 2012
