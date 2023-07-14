@@ -19,7 +19,6 @@ discard_dir = '../Preprocess/Video_Webcam/Discard'
 prediction_dir = '../Preprocess/Video_Webcam/Predictions'
 dataset = 'ViolentFlow-opt'
 model_file = "../Models/keras_model.h5"
-tflite_model_file = "../Models/tf_lite_model.tflite"
 loss = 'categorical_crossentropy'
 
 batch_size = 2
@@ -32,11 +31,7 @@ fps = get_camera_fps()
 model_size = os.path.getsize(model_file)/1048576
 print("Tamaño del modelo de keras: ", model_size, " MB")
 
-model_size = os.path.getsize(tflite_model_file)/1048576
-print("Tamaño del modelo: ", model_size, " MB")
-
 model = load_model(model_file, compile=False)
-#tflite_model = load_model(tflite_model_file, compile=False)
 
 '''
 sgd = SGD(learning_rate=learning_rate, decay=decay, momentum=momentum, nesterov=True)
@@ -67,7 +62,7 @@ for i in range(1, num_videos + 1):
     input_model = DataGenerator_adapted(directory=npy_dir.format(dataset),
                                         batch_size_data=batch_size,
                                         data_augmentation=False)
-
+    print(input_model.print_stats())
     time_before = time()
     # Predict violence
     predictions = model.predict(input_model)
