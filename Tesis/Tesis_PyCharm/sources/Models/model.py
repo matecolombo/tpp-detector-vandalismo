@@ -14,7 +14,7 @@ dataset = 'ViolentFlow-opt'
 model_file = "../Models/keras_model.h5"
 sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
-model = load_model('keras_model.h5', compile=False)
+#model = load_model('keras_model.h5', compile=False)
 
 model = load_model(model_file, compile=False)
 model.compile(optimizer=sgd,

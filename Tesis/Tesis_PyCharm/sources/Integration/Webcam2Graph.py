@@ -1,7 +1,7 @@
 import sys
 import os
 import shutil
-
+from time import time
 sys.path.append('../Preprocess')
 sys.path.append('../Networks')
 sys.path.append('../Models')
@@ -28,13 +28,18 @@ momentum = 0.9
 num_videos = 5
 fps = get_camera_fps()
 
-sgd = SGD(learning_rate=learning_rate, decay=decay, momentum=momentum, nesterov=True)
+model_size = os.path.getsize(model_file)/1048576
+print("Tamaño del modelo de keras: ", model_size, " MB")
 
 model = load_model(model_file, compile=False)
 
+'''
+sgd = SGD(learning_rate=learning_rate, decay=decay, momentum=momentum, nesterov=True)
 model.compile(optimizer=sgd,
               loss=loss,
               metrics=['accuracy'])
+'''
+
 
 if not os.path.exists(video_dir):
     os.makedirs(video_dir)
@@ -57,9 +62,12 @@ for i in range(1, num_videos + 1):
     input_model = DataGenerator_adapted(directory=npy_dir.format(dataset),
                                         batch_size_data=batch_size,
                                         data_augmentation=False)
-
+    print(input_model.print_stats())
+    time_before = time()
     # Predict violence
     predictions = model.predict(input_model)
+    delta_time = time() - time_before
+    print("Tiempo de predicción: ", delta_time)
 
     # Graph
     print_prediction(predictions)
