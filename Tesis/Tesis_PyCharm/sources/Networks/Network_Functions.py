@@ -71,6 +71,8 @@ class DataGenerator(Sequence):
         batch_path = [self.x_path[k] for k in batch_indexes]
         # get batch data
         batch_x, batch_y = self.data_generation(batch_path)
+
+        print(batch_x) #################################################################################3
         return batch_x, batch_y
 
     def on_epoch_end(self):
@@ -83,8 +85,8 @@ class DataGenerator(Sequence):
         batch_x = [self.load_data(d) for d in batch_path]
         batch_y = [self.y_dict[b] for b in batch_path]
         # transfer the data format and take one-hot coding for labels
-        batch_x = np.array(batch_x)
-        batch_y = np.array(batch_y)
+        batch_x = np.array(batch_x, dtype=np.float32)
+        batch_y = np.array(batch_y, dtype=np.float32)
         return batch_x, batch_y
 
     @staticmethod
