@@ -4,7 +4,7 @@ import io
 import csv
 
 # Download the model to yamnet.tflite
-interpreter = tf.lite.Interpreter('lite-model_yamnet_tflite_1.tflite')
+interpreter = tf.lite.Interpreter('../Yamnet-classifier/lite-model_yamnet_tflite_1.tflite')
 
 input_details = interpreter.get_input_details()
 waveform_input_index = input_details[0]['index']
