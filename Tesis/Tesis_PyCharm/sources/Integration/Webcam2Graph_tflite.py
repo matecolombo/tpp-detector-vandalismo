@@ -22,6 +22,8 @@ from tensorflow.keras.optimizers import SGD
 
 video_dir = '../Preprocess/Video_Webcam/AVI'
 npy_dir = '../Preprocess/Video_Webcam/NPY'
+video_dir_2 = 'AVI'
+npy_dir_2 = 'NPY'
 discard_dir = '../Preprocess/Video_Webcam/Discard'
 prediction_dir = '../Preprocess/Video_Webcam/Predictions'
 dataset = 'ViolentFlow-opt'
