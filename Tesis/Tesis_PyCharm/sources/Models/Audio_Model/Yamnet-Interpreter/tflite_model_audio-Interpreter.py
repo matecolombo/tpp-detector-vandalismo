@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import io
 import csv
+from scipy.io import wavfile
 
 
 def class_names_from_csv(class_map_csv_text):
@@ -23,8 +24,9 @@ embeddings_output_index = output_details[1]['index']
 spectrogram_output_index = output_details[2]['index']
 
 # Input: 3 seconds of silence as mono 16 kHz waveform samples.
-waveform = np.zeros(3 * 16000, dtype=np.float32)
-
+#waveform = np.zeros(3 * 16000, dtype=np.float32)
+waveform = wavfile.read('../ladrido.wav', )[1].astype(np.float32)
+#print(type(waveform))
 interpreter.resize_tensor_input(waveform_input_index, [len(waveform)], strict=True)
 interpreter.allocate_tensors()
 interpreter.set_tensor(waveform_input_index, waveform)
@@ -38,4 +40,12 @@ print(scores.shape, embeddings.shape, spectrogram.shape)  # (N, 521) (N, 1024) (
 # Download the YAMNet class map (see main YAMNet model docs) to yamnet_class_map.csv
 # See YAMNet TF2 usage sample for class_names_from_csv() definition.
 class_names = class_names_from_csv(open('yamnet_class_map.csv').read())
-print(class_names[scores.mean(axis=0).argmax()])  # Should print 'Silence'.
+# Suponiendo que 'scores' es un arreglo de numpy con los puntajes
+mean_scores = scores.mean(axis=0)
+top_indices = np.argsort(mean_scores)[-3:]  # Obtener los índices de los tres máximos
+
+# Obtener los nombres correspondientes a los índices máximos
+top_class_names = [class_names[i] for i in top_indices]
+
+# Imprimir los tres nombres correspondientes a los máximos puntajes
+print(top_class_names)
