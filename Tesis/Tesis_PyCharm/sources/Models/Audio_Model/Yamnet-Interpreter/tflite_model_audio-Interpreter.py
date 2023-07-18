@@ -3,6 +3,15 @@ import numpy as np
 import io
 import csv
 
+
+def class_names_from_csv(class_map_csv_text):
+    """Returns list of class names corresponding to score vector."""
+    class_map_csv = io.StringIO(class_map_csv_text)
+    class_names = [display_name for (class_index, mid, display_name) in csv.reader(class_map_csv)]
+    class_names = class_names[1:]  # Skip CSV header
+    return class_names
+
+
 # Download the model to yamnet.tflite
 interpreter = tf.lite.Interpreter('lite-model_yamnet_tflite_1.tflite')
 
@@ -28,5 +37,5 @@ print(scores.shape, embeddings.shape, spectrogram.shape)  # (N, 521) (N, 1024) (
 
 # Download the YAMNet class map (see main YAMNet model docs) to yamnet_class_map.csv
 # See YAMNet TF2 usage sample for class_names_from_csv() definition.
-class_names = class_names_from_csv(open('/path/to/yamnet_class_map.csv').read())
+class_names = class_names_from_csv(open('yamnet_class_map.csv').read())
 print(class_names[scores.mean(axis=0).argmax()])  # Should print 'Silence'.
