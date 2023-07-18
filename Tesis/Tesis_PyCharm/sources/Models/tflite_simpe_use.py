@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.models import load_model
-TFLITE_MODEL_FILE_V1 = "tf_lite_model_v2.tflite"
+TFLITE_MODEL_FILE_V1 = "tf_lite_model.tflite"
 TFLITE_MODEL_FILE_V2 = 'tf_lite_model_v2.tflite'
 
 model_file = TFLITE_MODEL_FILE_V1
