@@ -22,8 +22,8 @@ from tensorflow.keras.optimizers import SGD
 
 video_dir = '../Preprocess/Video_Webcam/AVI'
 npy_dir = '../Preprocess/Video_Webcam/NPY'
-video_dir_2 = 'AVI'
-npy_dir_2 = 'NPY'
+video_dir_2 = 'Video_Webcam/AVI'
+npy_dir_2 = 'Video_Webcam/NPY'
 discard_dir = '../Preprocess/Video_Webcam/Discard'
 prediction_dir = '../Preprocess/Video_Webcam/Predictions'
 dataset = 'ViolentFlow-opt'
@@ -97,7 +97,7 @@ if not os.path.exists(discard_dir):
 # Save2Npy(video_dir, npy_dir)
 
 # Generate input
-input_model = DataGenerator_tflite(directory=npy_dir.format(dataset),
+input_model = DataGenerator_tflite(directory=npy_dir_2.format(dataset),
                                    batch_size_data=batch_size,
                                    data_augmentation=False)
 batch_x, batch_y = input_model.__getitem__(0)  # Use index 0 to get the first batch

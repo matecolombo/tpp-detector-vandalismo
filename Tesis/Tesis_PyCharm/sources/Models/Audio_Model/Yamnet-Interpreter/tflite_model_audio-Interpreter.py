@@ -25,7 +25,9 @@ spectrogram_output_index = output_details[2]['index']
 # Input: 3 seconds of silence as mono 16 kHz waveform samples.
 waveform = np.zeros(3 * 16000, dtype=np.float32)
 
+print(waveform_input_index)
 interpreter.resize_tensor_input(waveform_input_index, [len(waveform)], strict=True)
+print(waveform_input_index)
 interpreter.allocate_tensors()
 interpreter.set_tensor(waveform_input_index, waveform)
 interpreter.invoke()
