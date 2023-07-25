@@ -15,7 +15,6 @@ def class_names_from_csv(class_map_csv_text):
 
 # Download the model to yamnet.tflite
 interpreter = tf.lite.Interpreter('lite-model_yamnet_tflite_1.tflite')
-
 input_details = interpreter.get_input_details()
 waveform_input_index = input_details[0]['index']
 output_details = interpreter.get_output_details()
@@ -23,11 +22,14 @@ scores_output_index = output_details[0]['index']
 embeddings_output_index = output_details[1]['index']
 spectrogram_output_index = output_details[2]['index']
 
+print(waveform_input_index)
+
 # Input: 3 seconds of silence as mono 16 kHz waveform samples.
 #waveform = np.zeros(3 * 16000, dtype=np.float32)
 waveform = wavfile.read('../ladrido.wav', )[1].astype(np.float32)
 #print(type(waveform))
-interpreter.resize_tensor_input(waveform_input_index, [len(waveform)], strict=True)
+interpreter.resize_tensor_input(waveform_input_index, [len(waveform)])
+print(waveform_input_index)
 interpreter.allocate_tensors()
 interpreter.set_tensor(waveform_input_index, waveform)
 interpreter.invoke()

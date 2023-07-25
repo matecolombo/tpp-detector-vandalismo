@@ -6,7 +6,7 @@ from tensorflow.keras.models import load_model
 TFLITE_MODEL_FILE_V1 = "tf_lite_model.tflite"
 TFLITE_MODEL_FILE_V2 = 'tf_lite_model_v2.tflite'
 
-model_file = TFLITE_MODEL_FILE_V1
+model_file = TFLITE_MODEL_FILE_V2
 interprete = tf.lite.Interpreter(model_file)
 
 input_shape = interprete.get_input_details()[0]['shape']
@@ -27,11 +27,11 @@ output_details = interprete.get_output_details()[0]
 
 # interprete.set_tensor(input_details['index'], batch_x)
 
-# interprete.invoke()
+interprete.invoke()
 # # delta_time = time() - time_before
 # # print("Tiempo de predicción: ", delta_time)
 
-# predictions = interprete.get_tensor(output_details['index'])
+predictions = interprete.get_tensor(output_details['index'])
 
-# print(predictions)
+print(predictions)
 
