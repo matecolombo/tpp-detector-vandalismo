@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 
+
 #####################################################
 import tensorflow as tf
 from tensorflow.keras import utils
@@ -17,8 +18,32 @@ from tensorflow.keras.callbacks import LearningRateScheduler
 from tensorflow.keras.callbacks import CSVLogger  # ModelCheckpoint,
 import tensorflow.keras as keras
 
+from tensorflow.keras.mixed_precision import global_policy, set_global_policy, Policy
+import tensorflow_model_optimization as tfmot
 
-os.environ['TF_GPU_ALLOCATOR_MAX_ALLOC_PERCENT'] = '100'
+# Definir el tipo de precisión mixta deseada (puede ser 'float16' o 'bfloat16')
+policy = global_policy()
+if policy.name == 'float32':
+    policy = Policy('mixed_float16')
+set_global_policy(policy)
+
+#os.environ['TF_GPU_ALLOCATOR_MAX_ALLOC_PERCENT'] = '100'
+
+os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+
+import tensorflow as tf
+YOUR_MEMORY_LIMIT_IN_BYTES = 7000000000
+# Configurar las opciones de la GPU
+gpus = tf.config.experimental.list_physical_devices('GPU')
+print(gpus)
+if gpus:
+    try:
+        # Restrict TensorFlow to only allocate a specific amount of GPU memory
+        tf.config.experimental.set_virtual_device_configuration(gpus[0], [
+                   tf.config.experimental.VirtualDeviceConfiguration(memory_limit=YOUR_MEMORY_LIMIT_IN_BYTES)])
+        #tf.config.experimental.set_memory_growth(gpus[0], True)
+    except RuntimeError as e:
+        print(e)
 
 # noinspection PyAttributeOutsideInit
 class DataGenerator(Sequence):
@@ -187,20 +212,25 @@ class DataGenerator(Sequence):
         return video
 
     def load_data(self, path):
-        # load the processed .npy files which have 5 channels (1-3 for RGB, 4-5 for optical flows)
-        data = np.load(path, mmap_mode='r', allow_pickle=True)
-        data = data.astype(np.float_)
-        # data = np.float32(data)
-        # sampling 64 frames uniformly from the entire video
-        data = self.uniform_sampling(video=data, target_frames=64)
-        # whether to utilize the data augmentation
-        if self.data_aug:
-            data[..., :3] = self.color_jitter(data[..., :3])
-            data = self.random_flip(data, prob=0.5)
-        # normalize rgb images and optical flows, respectively
-        data[..., :3] = self.normalize(data[..., :3])
-        data[..., 3:] = self.normalize(data[..., 3:])
-        return data
+        try:
+            # load the processed .npy files which have 5 channels (1-3 for RGB, 4-5 for optical flows)
+            data = np.load(path, mmap_mode='r', allow_pickle=True)
+            data = data.astype(np.float_)
+            # data = np.float32(data)
+            # sampling 64 frames uniformly from the entire video
+            data = self.uniform_sampling(video=data, target_frames=64)
+            # whether to utilize the data augmentation
+            if self.data_aug:
+                data[..., :3] = self.color_jitter(data[..., :3])
+                data = self.random_flip(data, prob=0.5)
+            # normalize rgb images and optical flows, respectively
+            data[..., :3] = self.normalize(data[..., :3])
+            data[..., 3:] = self.normalize(data[..., 3:])
+            return data
+        except Exception as e:
+            # If there's an error loading the file, print an error message and return None
+            print(f"Error loading file: {path}. Error message: {e}")
+            return None
 
 
 #######################################################
@@ -254,6 +284,7 @@ rgb = Conv3D(
     32, kernel_size=(3, 1, 1), strides=(1, 1, 1), kernel_initializer='he_normal', activation='relu', padding='same')(
     rgb)
 rgb = MaxPooling3D(pool_size=(1, 2, 2))(rgb)
+
 # Optical Flow channel
 opt = Conv3D(
     16, kernel_size=(1, 3, 3), strides=(1, 1, 1), kernel_initializer='he_normal', activation='relu', padding='same')(
@@ -331,7 +362,7 @@ print("Training using single GPU or CPU..")
 
 
 # Model Compiling
-sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+sgd = SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
 
 
@@ -369,9 +400,16 @@ callbacks_list = [check_point, csv_logger, reduce_lr]
 
 # Model Training
 # set essential params
-num_epochs = 5# 30
+num_epochs = 30
 num_workers = 16
-batch_size = 8
+batch_size = 2#8
+
+initial_sparsity = 0.0
+final_sparsity = 0.5
+begin_step = 2000
+end_step=4000
+power=3  
+frequency=100
 
 dataset = 'ViolentFlow-opt'
 
@@ -382,9 +420,35 @@ val_generator = DataGenerator(directory='../../Dataset/Numpy_Images/val'.format(
                               batch_size_data=batch_size,
                               data_augmentation=False)
 
+# Temporarily set the global default floating-point precision to 'float32'
+previous_floatx = tf.keras.backend.floatx()
+tf.keras.backend.set_floatx('float32')
+
+pruning_schedule = tfmot.sparsity.keras.PolynomialDecay(
+    initial_sparsity=initial_sparsity,
+    final_sparsity=final_sparsity,
+    begin_step=begin_step,
+    end_step=end_step,
+#   power=power,  
+#   frequency=frequency
+)
+
+model_for_pruning = tfmot.sparsity.keras.prune_low_magnitude(model, pruning_schedule=pruning_schedule)
+
+
+
+# Add the UpdatePruningStep callback
+callbacks_list = [check_point, csv_logger, reduce_lr, tfmot.sparsity.keras.UpdatePruningStep()]
+
+# Revert the global default floating-point precision to its original setting
+tf.keras.backend.set_floatx(previous_floatx)
+
+sgd = SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
+model_for_pruning.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
 
 # start to train
-hist = model.fit(
+#hist = model.fit(
+hist = model_for_pruning.fit(
     x=train_generator,
     validation_data=val_generator,
     callbacks=callbacks_list,
@@ -393,5 +457,14 @@ hist = model.fit(
     workers=num_workers,
     max_queue_size=4,
     steps_per_epoch=len(train_generator),
-    validation_steps=len(val_generator))
+    validation_steps=len(val_generator)
+)
+
+
+keras_file = 'Ro_model.h5'
+#keras.models.save_model(model, keras_file)
+keras.models.save_model(model_for_pruning, keras_file)
+
+
+
 

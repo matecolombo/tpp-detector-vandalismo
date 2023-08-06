@@ -4,8 +4,8 @@ import shutil
 from time import time
 import tensorflow as tf
 import numpy as np
-#from memory_profiler import profile
-#from memory_profiler import LogFile
+from memory_profiler import profile
+from memory_profiler import LogFile
 from tensorflow.lite.python.interpreter import OpResolverType
 
 # sys.stdout = LogFile('memory_profile_log')
@@ -20,9 +20,9 @@ from Network_Functions import DataGenerator_tflite
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import SGD
 
-#video_dir = '../Preprocess/Video_Webcam/AVI'
-#npy_dir = '../Preprocess/Video_Webcam/NPY'
-video_dir_2 = 'AVI'
+video_dir = '../Preprocess/Video_Webcam/AVI'
+npy_dir = '../Preprocess/Video_Webcam/NPY'
+video_dir_2 = 'Video_Webcam/AVI'
 npy_dir_2 = 'Video_Webcam/NPY'
 discard_dir = '../Preprocess/Video_Webcam/Discard'
 prediction_dir = '../Preprocess/Video_Webcam/Predictions'

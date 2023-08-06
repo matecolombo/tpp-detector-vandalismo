@@ -1,5 +1,5 @@
 import time
-import png
+#import png
 import busio
 import board
 import digitalio
@@ -10,9 +10,9 @@ from adafruit_ov7670 import (
     OV7670_TEST_PATTERN_COLOR_BAR_FADE,
 )
 
-import tempfile
+#import tempfile
 
-image_path = tempfile.mktemp(suffix='.png')
+#image_path = tempfile.mktemp(suffix='.png')
 
 # Ensure the camera is shut down, so that it releases the SDA/SCL lines,
 # then create the configuration I2C bus
@@ -57,7 +57,7 @@ cam = OV7670(
 )
 
 # Configuración de la comunicación serie
-#uart = busio.UART(board.GP1, board.GP0, baudrate=115200)  # Conexión UART (RX, TX)
+uart = busio.UART(board.GP1, board.GP0, baudrate=115200)  # Conexión UART (RX, TX)
 
 # Dentro del bucle while:
 #while True:
@@ -66,7 +66,7 @@ cam.capture(buf)
 
 # RGB565 (also known as 16-bit RGB) is a color format that uses 16 bits to represent a color,
 # with 5 bits for the red channel, 6 bits for the green channel, and 5 bits for the blue channel. 
-
+'''
 # Guardar la imagen en un archivo temporal en la Raspberry Pi
 image_data = []
 for y in range(cam.height):
@@ -95,4 +95,3 @@ except Exception as e:
 # ...
 
 #  time.sleep(0.05)
-'''

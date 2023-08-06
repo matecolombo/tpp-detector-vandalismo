@@ -35,5 +35,5 @@ for i in range(0, 100):
     interpreter.invoke()
 
     predictions = interpreter.get_tensor(output_details['index'])
-    output_class = class_names[np.argmax(predictions[0][0])
+    output_class = class_names[np.argmax(predictions[0][0])]
     print(i, "The predicted class is", output_class)
