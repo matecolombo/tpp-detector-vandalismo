@@ -19,6 +19,9 @@ import csv
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model, layers
+from tensorflow.keras.losses import SparseCategoricalCrossentropy
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Lambda
 from scipy.io import wavfile
 import scipy.signal as signal
 import io
@@ -141,15 +144,29 @@ def class_names(class_map_csv):
     return np.array([display_name for (_, _, display_name) in reader])
 
 
-def yamnet_shout_detector(features, params):
-    net = layers.Reshape((params.patch_frames, params.patch_bands, 1),
-                         input_shape=(params.patch_frames, params.patch_bands))(features)
-    for (i, (layer_fun, kernel, stride, filters)) in enumerate(_YAMNET_LAYER_DEFS):
-        net = layer_fun('layer{}'.format(i + 1), kernel, stride, filters, params)(net)
-    embeddings = layers.GlobalAveragePooling2D()(net)
-    logits = layers.Dense(units=1, use_bias=True)(embeddings)  # Binary classification (1 unit for shout vs. non-shout)
-    predictions = layers.Activation(activation='sigmoid')(logits)  # Sigmoid activation for binary classification
-    return predictions, embeddings
+def yamnet_scream_detection(features, params):
+  """Define the modified YAMNet model for scream detection.
+
+  Only detects two classes: "scream" and "non_scream".
+
+  Args:
+    features: Input features, e.g., log mel spectrogram patches.
+    params: An instance of Params containing hyperparameters.
+
+  Returns:
+    predictions: Output predictions for two classes.
+    embeddings: Embeddings per time frame.
+  """
+  net = layers.Reshape(
+      (params.patch_frames, params.patch_bands, 1),
+      input_shape=(params.patch_frames, params.patch_bands))(features)
+  for (i, (layer_fun, kernel, stride, filters)) in enumerate(_YAMNET_LAYER_DEFS):
+    net = layer_fun('layer{}'.format(i + 1), kernel, stride, filters, params)(net)
+  embeddings = layers.GlobalAveragePooling2D()(net)
+  logits = layers.Dense(units=2, use_bias=True)(embeddings)  # 2 classes: "scream" and "non_scream"
+  predictions = layers.Activation(activation='softmax')(logits)  # Use softmax for probability outputs
+  return predictions, embeddings
+
 
 
 def create_modified_yamnet(num_classes=2):
@@ -242,7 +259,7 @@ def waveform_to_log_mel_spectrogram_patches(waveform, params):
       # features has shape [<# patches>, <# STFT frames in an patch>, params.mel_bands]
 
       # Pad the features tensor to ensure it has a fixed number of patches (20 in this case).
-      num_padding_patches = tf.maximum(0, 20 - tf.shape(features)[0])
+      num_padding_patches = tf.maximum(0, 16 - tf.shape(features)[0])
       paddings = [[0, num_padding_patches], [0, 0], [0, 0]]
       features = tf.pad(features, paddings, "CONSTANT", constant_values=0)
 
@@ -278,6 +295,7 @@ def pad_waveform(waveform, params):
                             mode='CONSTANT', constant_values=0.0)
     print("Waveform shape:", waveform.shape)
     print("Padded Waveform shape:", padded_waveform.shape)
+
     return padded_waveform
 
 
@@ -291,16 +309,128 @@ def ensure_sample_rate(original_sample_rate, waveform,
   return desired_sample_rate, waveform
 
 
-waveform = wavfile.read('./AUDIOS/train/train_data/audio_grito.wav', )[1].astype(np.float32)
-wav_file_name = './AUDIOS/train/train_data/audio_grito.wav'
-sample_rate, wav_data = wavfile.read(wav_file_name, 'rb')
-sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
+# waveform = wavfile.read('./AUDIOS/train/train_data/audio_grito.wav', )[1].astype(np.float32)
+# wav_file_name = './AUDIOS/train/train_data/audio_grito.wav'
+# sample_rate, wav_data = wavfile.read(wav_file_name, 'rb')
+# sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
 
-# Crear el modelo modificado para detección de gritos usando la función create_modified_yamnet.
-wav_data = wav_data / tf.int16.max
-waveform_padded = pad_waveform(waveform, params)
-log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(waveform_padded, params)
+# # Crear el modelo modificado para detección de gritos usando la función create_modified_yamnet.
+# wav_data = wav_data / tf.int16.max
+# waveform_padded = pad_waveform(waveform, params)
+# log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(waveform_padded, params)
 
-model = yamnet(features, params)
+# # modified_model = create_modified_yamnet(2)
+# model = yamnet(features, params)
 
-print(model)
+
+def yamnet_scream_detection_frames_model(params):
+  """Defines the modified YAMNet scream detection model.
+
+  Args:
+    params: An instance of Params containing hyperparameters.
+
+  Returns:
+    A model accepting (num_samples,) waveform input and emitting:
+    - predictions: (num_patches, 2) matrix of class scores per time frame for "scream" and "non_scream"
+    - embeddings: (num_patches, embedding size) matrix of embeddings per time frame
+    - log_mel_spectrogram: (num_spectrogram_frames, num_mel_bins) spectrogram feature matrix
+  """
+
+  waveform = layers.Input(batch_shape=(None,), dtype=tf.float32)
+  waveform_padded = pad_waveform(waveform, params)
+  log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(
+      waveform_padded, params)
+  predictions, embeddings = yamnet_scream_detection(features, params)
+  frames_model = Model(
+      name='yamnet_scream_detection_frames', inputs=waveform,
+      outputs=[predictions, embeddings, log_mel_spectrogram])
+  return frames_model
+
+
+from tensorflow.keras.layers import Lambda
+
+# Define la longitud máxima de las muestras de audio
+max_audio_length = 80000
+# Create the YAMNet scream detection model
+yamnet_scream_detection_model = yamnet_scream_detection_frames_model(params)
+
+# def custom_pad(x):
+#     return tf.compat.v1.pad(x, paddings=[[0, max_audio_length - tf.shape(x)[0]]], mode='CONSTANT', constant_values=0.0)
+
+# # Utiliza la capa Lambda para aplicar la función personalizada de pad
+# padded_input = Lambda(custom_pad)(yamnet_scream_detection_frames_model.input)  # Reemplaza 'input_layer' con la entrada real de tu modelo
+
+
+# Compile the model
+optimizer = Adam(learning_rate=0.001)
+loss = SparseCategoricalCrossentropy()
+yamnet_scream_detection_model.compile(optimizer=optimizer, loss=loss)
+
+yamnet_scream_detection_model.summary()
+
+
+# ENTRENAMIENTOOO
+
+import os
+
+non_scream_dir = './AUDIOS/train/train_data/non_scream'
+scream_dir = './AUDIOS/train/train_data/scream'
+
+
+def preprocess_audio_file(filepath, target_length=None):
+    sample_rate, wav_data = wavfile.read(filepath)
+    wav_data = np.mean(wav_data, axis=1).astype(np.float32)
+    sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
+
+    # print(wav_data.shape)
+    
+    # Pad or truncate the audio data to the target length
+    # if target_length is not None:
+    #     if len(wav_data) < target_length:
+    #         pad_length = target_length - len(wav_data)
+    #         wav_data = np.pad(wav_data, (0, pad_length), mode='constant')
+    #     elif len(wav_data) > target_length:
+    #         wav_data = wav_data[:target_length]
+    
+    return wav_data
+
+
+def load_data(data_dir, label, target_length=None):
+    data = []
+    labels = []
+    target_length = 80000
+    for filename in os.listdir(data_dir):
+        filepath = os.path.join(data_dir, filename)
+        
+        wav_data = preprocess_audio_file(filepath, target_length)
+        data.append(wav_data)
+        labels.append(label)
+    return data, labels
+
+# Define the target length for padding/truncating the audio samples
+target_length = 67368  # Use the maximum length among all samples
+
+non_scream_data, non_scream_labels = load_data(non_scream_dir, 0)
+scream_data, scream_labels = load_data(scream_dir, 1)
+
+# Combina los datos y las etiquetas
+all_data = non_scream_data + scream_data
+all_labels = non_scream_labels + scream_labels
+
+# # Convert the lists to TensorFlow tensors
+# all_data = tf.convert_to_tensor(all_data)
+# all_labels = tf.convert_to_tensor(all_labels)
+
+# # Convierte las listas de Python a arrays de numpy
+all_data = np.array(all_data)
+all_labels = np.array(all_labels)
+
+from sklearn.model_selection import train_test_split
+
+# Divide los datos en conjuntos de entrenamiento y prueba
+train_data, test_data, train_labels, test_labels = train_test_split(all_data, all_labels, test_size=0.2, random_state=42)
+train_data = np.array(train_data, dtype=np.float32)
+train_labels = np.array(train_labels, dtype=np.int32)
+
+print(train_data.shape)
+yamnet_scream_detection_model.fit(train_data, train_labels, epochs=20, batch_size=64, validation_split=0.1)
