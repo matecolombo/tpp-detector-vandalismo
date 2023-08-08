@@ -89,7 +89,7 @@ def load_data(data_dir, label, target_length=None):
         spectrogram_rgb = tf.image.grayscale_to_rgb(spectrogram)
         data.append(spectrogram_rgb)
         labels.append(label)
-        if i == 500:
+        if i == 600:
             break
     # labels = [label] * len(data)
     return data, labels
@@ -204,11 +204,11 @@ model = keras.Model(inputs, outputs)
 model.summary()
 
 # Compilar el modelo
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model.compile(optimizer='adam', loss='SparseCategoricalCrossentropy', metrics=['accuracy'])
 
 # Entrenar el modelo con el dataset
 batch_size = 2
-epochs = 30
+epochs = 20
 AUTOTUNE = tf.data.AUTOTUNE
 
 
@@ -223,7 +223,7 @@ train_ds = train_ds.batch(batch_size)
 train_ds = train_ds.cache().prefetch(AUTOTUNE)
 model.fit(
    train_ds,
-   validation_data=eval_ds,
+#    validation_data=eval_ds,
    epochs=epochs,
    callbacks=tf.keras.callbacks.EarlyStopping(verbose=1, patience=2),
 
