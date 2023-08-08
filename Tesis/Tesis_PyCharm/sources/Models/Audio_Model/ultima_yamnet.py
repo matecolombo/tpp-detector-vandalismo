@@ -222,7 +222,9 @@ print('Input shape:', input_shape)
 train_ds = train_ds.batch(batch_size)
 train_ds = train_ds.cache().prefetch(AUTOTUNE)
 model.fit(
-   train_ds, 
+   train_ds,
+   validation_data=eval_ds,
    epochs=epochs,
-   callbacks=tf.keras.callbacks.EarlyStopping(verbose=1, patience=2)
+   callbacks=tf.keras.callbacks.EarlyStopping(verbose=1, patience=2),
+
    )
