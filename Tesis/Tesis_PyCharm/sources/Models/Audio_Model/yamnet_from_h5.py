@@ -5,6 +5,8 @@ import yamnet
 from scipy.io import wavfile
 import params
 import numpy as np
+import tensorflow_hub as hub
+
 
 params = params.Params()
 
@@ -30,51 +32,79 @@ def load_model():
               'embeddings': embeddings, 
               'log_mel_spectrogram': log_mel_spectrogram}
 
-  # Carga del modelo Yamnet pre-entrenado
-  # yamnet_model = tf.keras.models.load_weights('./yamnet.h5')
 
-  
   yamnet_model = YAMNet("yamnet.h5", params)._yamnet
 
   return yamnet_model
 
-
-
 yamnet_model = load_model()
-yamnet_model.summary()
+# yamnet_model.summary()
 
 # Obtener la última capa de salida del modelo Yamnet
 yamnet_output = yamnet_model.layers[-3].output
 
-# Agregar capas adicionales para la nueva tarea (gritos vs. no gritos)
-# Puedes experimentar con la arquitectura de estas capas según tus necesidades.
-# Aquí hay un ejemplo básico usando una capa densa seguida de una capa de salida.
-tf.compat.v1.disable_eager_execution()
-# Assuming yamnet_output is the input tensor for your custom layers
-# Assuming yamnet_output is the input tensor for your custom layers
-model_hijo = tf.keras.Sequential([
-    tf.keras.layers.Dense(128, activation='relu', input_shape=yamnet_output.shape[1:]),
-    tf.keras.layers.Dropout(0.5),  # To avoid overfitting
-    tf.keras.layers.Dense(1, activation='sigmoid')  # Binary output layer (screams or no screams)
-])
+# yamnet_model_handle = 'https://tfhub.dev/google/yamnet/1'
+# yamnet_model = hub.load(yamnet_model_handle)
 
-# Create the child model
-# model_hijo = tf.keras.models.Model(inputs=yamnet_model.input, outputs=output)
+input_segment = tf.keras.layers.Input(shape=(), dtype=tf.float32, name='audio')
+embedding_extraction_layer = hub.KerasLayer(yamnet_model,
+                                            trainable=False, name='yamnet')
+
+# intermediate_model = tf.keras.Model(inputs=yamnet_model.input, outputs=yamnet_model.layers[-3].output)
 
 # Congelar todas las capas del modelo padre para que no se actualicen durante el entrenamiento
 for layer in yamnet_model.layers:
     layer.trainable = False
 
+# Agregar capas adicionales para la nueva tarea (gritos vs. no gritos)
+model_hijo = tf.keras.Sequential([
+   tf.keras.layers.Input(shape=(1024), dtype=tf.float32,
+                          name='input_embedding'),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dropout(0.5),  # Para evitar el sobreajuste
+    tf.keras.layers.Dense(1, activation='sigmoid')  # Capa de salida binaria (gritos o no gritos)
+])
 
-model_hijo.summary()
-# Compilar el modelo hijo para la nueva tarea
-model_hijo.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model_hijo.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                 optimizer="adam",
+                 metrics=['accuracy'])
 
 
 
-# Ahora puedes usar el modelo hijo para entrenar con tus datos etiquetados de gritos y no gritos.
-# Asegúrate de que tus datos de entrenamiento estén en el formato adecuado para la entrada del modelo Yamnet.
-# Por ejemplo, puedes usar la misma longitud de ventana que se usó durante el entrenamiento del modelo Yamnet para extraer características.
+# callback = tf.keras.callbacks.EarlyStopping(monitor='loss',
+#                                             patience=3,
+#                                             restore_best_weights=True)
+
+
+class ReduceMeanLayer(tf.keras.layers.Layer):
+  def __init__(self, axis=0, **kwargs):
+    super(ReduceMeanLayer, self).__init__(**kwargs)
+    self.axis = axis
+
+  def call(self, input):
+    return tf.math.reduce_mean(input, axis=self.axis)
+
+_, embeddings_output, _ = embedding_extraction_layer(input_segment)
+serving_outputs = model_hijo(embeddings_output)
+serving_outputs = ReduceMeanLayer(axis=0, name='classifier')(serving_outputs)
+serving_model = tf.keras.Model(input_segment, serving_outputs)
+
+
+# serving_model.save(saved_model_path, include_optimizer=False)
+# Crear el modelo completo fusionando el intermediate_model y el model_hijo
+# child_model = tf.keras.models.Model(inputs=intermediate_model.input, outputs=model_hijo(intermediate_model.output))
+
+# Congelar todas las capas del modelo padre (intermediate_model) para que no se actualicen durante el entrenamiento
+# for layer in intermediate_model.layers:
+#     layer.trainable = False
+
+# # Compilar el child_model
+# child_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# child_model.summary()
+
+
+
 
 
 
@@ -85,116 +115,66 @@ scream_dir = './AUDIOS/train/train_data/scream'
 
 labels = []
 features_list = []
+data_list = []
 
 
-# waveform = wavfile.read('./AUDIOS/audio_grito.wav', )[1].astype(np.float32)
-# wav_file_name = './AUDIOS/audio_grito.wav'
-# sample_rate, wav_data = wavfile.read(wav_file_name, 'rb')
-# sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
-
-# # Crear el modelo modificado para detección de gritos usando la función create_modified_yamnet.
-# wav_data = wav_data / tf.int16.max
-# waveform_padded = pad_waveform(waveform, params)
-# log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(waveform_padded, params)
-
-# # Definir la función de normalización
-# def normalize_waveform(waveform, max_value):
-#     return waveform / max_value
-
-
-
-i=0
-# Cargar los archivos no gritos y etiquetarlos como 0
-for filename in os.listdir(non_scream_dir):
-    i+=1
-    filepath = os.path.join(non_scream_dir, filename)
-    sample_rate, wav_data = wavfile.read(filepath, 'rb')
+def preprocess_audio_file(filepath):
+    sample_rate, wav_data = wavfile.read(filepath)
     wav_data = np.mean(wav_data, axis=1).astype(np.float32)
     wav_data = tf.cast(wav_data, tf.float32)
     sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
-    wav_data = wav_data / tf.reduce_max(tf.abs(wav_data))
-    print(wav_data.shape)
-    waveform_padded = pad_waveform(wav_data, params)
-    log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(waveform_padded, params)
-    print(features.shape)
-    # Realizar cualquier preprocesamiento adicional que necesites en los datos (por ejemplo, cambiar la duración)
-    features_list.append(features)
-    labels.append(0)
-    if i == 5:
-        break
-
-i=0
-# # Cargar los archivos de gritos y etiquetarlos como 1
-for filename in os.listdir(scream_dir):
-    i+=1
-    filepath = os.path.join(scream_dir, filename)
-    sample_rate, wav_data = wavfile.read(filepath, 'rb')
-    wav_data = np.mean(wav_data, axis=1).astype(np.float32)
-    wav_data = tf.cast(wav_data, tf.float32)
-    sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
-    wav_data = wav_data / tf.reduce_max(tf.abs(wav_data))
-    print(wav_data.shape)
-    waveform_padded = pad_waveform(wav_data, params)
-    log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(waveform_padded, params)
-
-    print(features.shape)
-
-    # Realizar cualquier preprocesamiento adicional que necesites en los datos (por ejemplo, cambiar la duración)
-    features_list.append(features)
-    labels.append(1)
-    if i == 5:
-        break
-
-# print(len(features_list))
-
-# filtered_features_list = [tensor for tensor in features_list]
-
-# Print the contents of filtered_features_list and labels for investigation
-# print("Filtered Features List:")
-# for i, tensor in enumerate(filtered_features_list):
-#     print(f"Sample {i}: {tensor.shape}")
+    return wav_data
 
 
-# # Convert lists to TensorFlow tensors
-# features_tf = tf.convert_to_tensor(filtered_features_list)
-# labels_tf = tf.convert_to_tensor(labels)
+def load_data(data_dir, label):
+    data = []
+    labels = []
+    for filename in os.listdir(data_dir):
+        filepath = os.path.join(data_dir, filename)
+        wav_data = preprocess_audio_file(filepath)
+        data.append(wav_data)
+        labels.append(label)
+    return data, labels
 
-# with tf.compat.v1.Session() as sess:
-#     features_np = sess.run(features_tf)
-#     labels_np = sess.run(labels_tf)
+
+non_scream_data, non_scream_labels = load_data(non_scream_dir, 0)  # Label 0 para no gritos
+scream_data, scream_labels = load_data(scream_dir, 1)  #
 
 
-# Print the shapes of both arrays
-# print("Features shape:", features_np.shape)
-# print("Labels shape:", labels_np.shape)
-# # Convertir las listas en arreglos numpy
-# features = np.array(features_list)
-# labels = np.array(labels)
+# Combina los datos y las etiquetas
+all_data = non_scream_data + scream_data
+all_labels = non_scream_labels + scream_labels
 
-# print(features[0])
-# print(labels[0])
 
-# print(features.shape) 
-# print(labels.shape)  
+# Convierte las listas de Python a arrays de numpy
+all_data = np.array(all_data)
+all_labels = np.array(all_labels)
 
-# features = tf.convert_to_tensor(features_list)
-# labels = tf.convert_to_tensor(labels)
+# Divide los datos en conjuntos de entrenamiento y prueba
+train_data, test_data, train_labels, test_labels = train_test_split(all_data, all_labels, test_size=0.2, random_state=42)
 
 from sklearn.model_selection import train_test_split
 
-# print(len(labels))
-# print(features_list)
 
-# Dividir los datos en entrenamiento (80%) y prueba (20%)
-X_train, X_test, y_train, y_test = train_test_split(features_list, labels, test_size=0.2, random_state=42)
+# num_classes = 2  # Number of classes (screams and non-screams)
+# y_train = tf.keras.utils.to_categorical(y_train, num_classes=num_classes)
+
+# print(y_train.tolist())
+
+# # Convert features_list and labels to numpy arrays
+# X_train = tf.convert_to_tensor(X_train, dtype=tf.float32)
+# y_train = tf.convert_to_tensor(y_train, dtype=tf.float32)
+
 
 num_epochs = 30
-batch_size = 2
-# tf.compat.v1.disable_eager_execution()
+batch_size = 4
 
-# Calculate the number of steps per epoch
-steps_per_epoch = int(np.ceil(len(X_train) / batch_size))
+# Suponiendo que tienes ya definido el modelo (model) y compilado con una función de pérdida apropiada, etc.
+model.fit(train_data, train_labels, epochs=10, batch_size=32, validation_split=0.1)
 
-# Entrena el modelo hijo con tus datos, specifying steps_per_epoch
-model_hijo.fit(X_train, y_train, epochs=num_epochs, batch_size=batch_size, steps_per_epoch=steps_per_epoch)
+# # Calculate the number of steps per epoch
+# steps_per_epoch = int(np.ceil(len(X_train) / batch_size))
 
+
+# # Entrena el modelo hijo con tus datos, specifying steps_per_epoch
+# model_hijo.fit(train_data, train_labels, epochs=num_epochs, batch_size=batch_size, steps_per_epoch=steps_per_epoch)

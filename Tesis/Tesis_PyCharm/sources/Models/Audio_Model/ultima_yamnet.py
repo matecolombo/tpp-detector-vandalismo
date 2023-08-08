@@ -56,8 +56,9 @@ def preprocess_audio_file(filepath, target_length):
     waveform_length = tf.shape(waveform_tensor)[0]
     
     if waveform_length > target_length:
-        # Recortar el waveform si es más largo que target_length
-        start_idx = (waveform_length - target_length) // 2
+        # Encontrar el índice del punto de máxima amplitud
+        max_amplitude_idx = tf.argmax(tf.abs(waveform_tensor))
+        start_idx = tf.maximum(0, max_amplitude_idx - target_length // 2)
         end_idx = start_idx + target_length
         waveform = waveform_tensor[start_idx:end_idx]
     else:
@@ -78,7 +79,7 @@ def load_data(data_dir, label, target_length=None):
     i= 0
     data = []
     labels = []
-    target_length = 160000
+    target_length = 180000
     for filename in os.listdir(data_dir):
         i = i + 1
         print(i)
@@ -89,7 +90,7 @@ def load_data(data_dir, label, target_length=None):
         spectrogram_rgb = tf.image.grayscale_to_rgb(spectrogram)
         data.append(spectrogram_rgb)
         labels.append(label)
-        if i == 600:
+        if i == 300:
             break
     # labels = [label] * len(data)
     return data, labels
@@ -103,8 +104,6 @@ all_labels = non_scream_labels + scream_labels
 
 # Crear el dataset usando tf.data.Dataset.from_tensor_slices
 spectrogram_ds = tf.data.Dataset.from_tensor_slices((all_data, all_labels))
-
-
 
 # Definir el tamaño del conjunto de evaluación y prueba
 eval_size = int(0.2 * len(all_data))  # Por ejemplo, usar el 20% para evaluación
@@ -228,3 +227,17 @@ model.fit(
    callbacks=tf.keras.callbacks.EarlyStopping(verbose=1, patience=2),
 
    )
+
+# Especifica la ruta donde deseas guardar el archivo .h5
+model_filename = 'MovileNetV2_adapt.h5'
+
+# Guarda el modelo en el archivo .h5
+model.save(model_filename)
+
+print(f"Modelo guardado en {model_filename}")
+
+
+from keras.utils import plot_model
+# Guardar un diagrama de la arquitectura del modelo en un archivo PNG
+plot_model(model, to_file='modelo_arquitectura.png', show_shapes=True, show_layer_names=True)
+print("Arquitectura del modelo guardada en modelo_arquitectura.png")

@@ -43,7 +43,7 @@ class Params:
     def patch_bands(self):
         return self.mel_bands
 
-    num_classes: int = 521
+    num_classes: int = 2
     conv_padding: str = 'same'
     batchnorm_center: bool = True
     batchnorm_scale: bool = False

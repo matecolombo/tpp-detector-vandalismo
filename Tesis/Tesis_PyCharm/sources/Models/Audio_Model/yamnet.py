@@ -21,11 +21,11 @@ import tensorflow as tf
 from tensorflow.keras import Model, layers
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Lambda
+from tensorflow.keras.layers import Lambda, Dense
 from scipy.io import wavfile
 import scipy.signal as signal
 import io
-import features as features_lib
+# import features as features_lib
 import params
 
 params = params.Params()
@@ -145,27 +145,31 @@ def class_names(class_map_csv):
 
 
 def yamnet_scream_detection(features, params):
-  """Define the modified YAMNet model for scream detection.
+    """Define the modified YAMNet model for scream detection.
 
-  Only detects two classes: "scream" and "non_scream".
+    Only detects two classes: "scream" and "non_scream".
 
-  Args:
-    features: Input features, e.g., log mel spectrogram patches.
-    params: An instance of Params containing hyperparameters.
+    Args:
+      features: Input features, e.g., log mel spectrogram patches.
+      params: An instance of Params containing hyperparameters.
 
-  Returns:
-    predictions: Output predictions for two classes.
-    embeddings: Embeddings per time frame.
-  """
-  net = layers.Reshape(
-      (params.patch_frames, params.patch_bands, 1),
-      input_shape=(params.patch_frames, params.patch_bands))(features)
-  for (i, (layer_fun, kernel, stride, filters)) in enumerate(_YAMNET_LAYER_DEFS):
-    net = layer_fun('layer{}'.format(i + 1), kernel, stride, filters, params)(net)
-  embeddings = layers.GlobalAveragePooling2D()(net)
-  logits = layers.Dense(units=2, use_bias=True)(embeddings)  # 2 classes: "scream" and "non_scream"
-  predictions = layers.Activation(activation='softmax')(logits)  # Use softmax for probability outputs
-  return predictions, embeddings
+    Returns:
+      predictions: Output predictions for binary classification (scream vs. non_scream).
+      embeddings: Embeddings per time frame.
+    """
+    net = layers.Reshape(
+        (params.patch_frames, params.patch_bands, 1),
+        input_shape=(params.patch_frames, params.patch_bands))(features)
+    for (i, (layer_fun, kernel, stride, filters)) in enumerate(_YAMNET_LAYER_DEFS):
+        net = layer_fun('layer{}'.format(i + 1), kernel, stride, filters, params)(net)
+    # Add more layers here for a smoother transition
+
+    embeddings = layers.GlobalAveragePooling2D()(net)
+
+    # Modify the final Dense layer to have 1 unit for binary classification
+    predictions = layers.Dense(units=1, activation='sigmoid', use_bias=True)(embeddings)
+
+    return predictions, embeddings
 
 
 
@@ -267,36 +271,20 @@ def waveform_to_log_mel_spectrogram_patches(waveform, params):
   
 
 def pad_waveform(waveform, params):
-    """Pads waveform with silence if needed to get an integral number of patches."""
-    # In order to produce one patch of log mel spectrogram input to YAMNet, we
-    # need at least one patch window length of waveform plus enough extra samples
-    # to complete the final STFT analysis window.
+    # Assuming waveform is 2D with shape (None, 32000), where 32000 is the waveform length
+    waveform = waveform[:, 0]  # Take the first dimension to make it 1D
+    waveform_len = tf.shape(waveform)[0]
+    target_length = params.expected_waveform_length
 
-    min_waveform_seconds = (
-        params.patch_window_seconds +
-        params.stft_window_seconds - params.stft_hop_seconds)
-    min_num_samples = tf.cast(min_waveform_seconds * params.sample_rate, tf.int32)
-    num_samples = tf.shape(waveform)[0]
-    num_padding_samples = tf.maximum(0, min_num_samples - num_samples)
-    # In addition, there might be enough waveform for one or more additional
-    # patches formed by hopping forward. If there are more samples than one patch,
-    # round up to an integral number of hops.
-    num_samples = tf.maximum(num_samples, min_num_samples)
-    num_samples_after_first_patch = num_samples - min_num_samples
-    hop_samples = tf.cast(params.patch_hop_seconds * params.sample_rate, tf.int32)
-    num_hops_after_first_patch = tf.cast(tf.math.ceil(
-            tf.cast(num_samples_after_first_patch, tf.float32) /
-            tf.cast(hop_samples, tf.float32)), tf.int32)
-    num_padding_samples += (
-        hop_samples * num_hops_after_first_patch - num_samples_after_first_patch)
-    print("num_padding_samples:", num_padding_samples)
-    print("Waveform shape:", waveform.shape)
-    padded_waveform = tf.pad(waveform, [[0, num_padding_samples]],
-                            mode='CONSTANT', constant_values=0.0)
-    print("Waveform shape:", waveform.shape)
-    print("Padded Waveform shape:", padded_waveform.shape)
+    # Compute the number of zeros to add
+    padding_length = target_length - waveform_len
 
-    return padded_waveform
+    # Pad the waveform with zeros at the end
+    paddings = tf.expand_dims([0, padding_length], axis=0)  # Reshape to 2D tensor
+    waveform_padded = tf.pad(waveform, paddings)
+
+    return waveform_padded
+
 
 
 def ensure_sample_rate(original_sample_rate, waveform,
@@ -324,27 +312,18 @@ def ensure_sample_rate(original_sample_rate, waveform,
 
 
 def yamnet_scream_detection_frames_model(params):
-  """Defines the modified YAMNet scream detection model.
+    # Set the expected waveform length for padding
+    # params.expected_waveform_length = 32000  # Replace this with your desired length
 
-  Args:
-    params: An instance of Params containing hyperparameters.
-
-  Returns:
-    A model accepting (num_samples,) waveform input and emitting:
-    - predictions: (num_patches, 2) matrix of class scores per time frame for "scream" and "non_scream"
-    - embeddings: (num_patches, embedding size) matrix of embeddings per time frame
-    - log_mel_spectrogram: (num_spectrogram_frames, num_mel_bins) spectrogram feature matrix
-  """
-
-  waveform = layers.Input(batch_shape=(None,), dtype=tf.float32)
-  waveform_padded = pad_waveform(waveform, params)
-  log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(
-      waveform_padded, params)
-  predictions, embeddings = yamnet_scream_detection(features, params)
-  frames_model = Model(
-      name='yamnet_scream_detection_frames', inputs=waveform,
-      outputs=[predictions, embeddings, log_mel_spectrogram])
-  return frames_model
+    waveform = layers.Input(batch_shape=(None, params.expected_waveform_length), dtype=tf.float32)
+    waveform_padded = pad_waveform(waveform, params)
+    log_mel_spectrogram, features = waveform_to_log_mel_spectrogram_patches(
+        waveform_padded, params)
+    predictions, embeddings = yamnet_scream_detection(features, params)
+    frames_model = Model(
+        name='yamnet_scream_detection_frames', inputs=waveform,
+        outputs=[predictions, embeddings, log_mel_spectrogram])
+    return frames_model
 
 
 from tensorflow.keras.layers import Lambda
@@ -352,7 +331,7 @@ from tensorflow.keras.layers import Lambda
 # Define la longitud máxima de las muestras de audio
 max_audio_length = 80000
 # Create the YAMNet scream detection model
-yamnet_scream_detection_model = yamnet_scream_detection_frames_model(params)
+# yamnet_scream_detection_model = yamnet_scream_detection_frames_model(params)
 
 # def custom_pad(x):
 #     return tf.compat.v1.pad(x, paddings=[[0, max_audio_length - tf.shape(x)[0]]], mode='CONSTANT', constant_values=0.0)
@@ -362,11 +341,15 @@ yamnet_scream_detection_model = yamnet_scream_detection_frames_model(params)
 
 
 # Compile the model
-optimizer = Adam(learning_rate=0.001)
-loss = SparseCategoricalCrossentropy()
-yamnet_scream_detection_model.compile(optimizer=optimizer, loss=loss)
+# yamnet_scream_detection_model.layers[-1].units = 1
+# yamnet_scream_detection_model.layers[-1].activation = 'sigmoid'
+# num_classes = 2  # Number of classes for binary classification
+# yamnet_scream_detection_model.add(Dense(num_classes, activation='sigmoid'))
 
-yamnet_scream_detection_model.summary()
+# yamnet_scream_detection_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['binary_accuracy'])
+
+
+# yamnet_scream_detection_model.summary()
 
 
 # ENTRENAMIENTOOO
@@ -384,13 +367,13 @@ def preprocess_audio_file(filepath, target_length=None):
 
     # print(wav_data.shape)
     
-    # Pad or truncate the audio data to the target length
-    # if target_length is not None:
-    #     if len(wav_data) < target_length:
-    #         pad_length = target_length - len(wav_data)
-    #         wav_data = np.pad(wav_data, (0, pad_length), mode='constant')
-    #     elif len(wav_data) > target_length:
-    #         wav_data = wav_data[:target_length]
+    #Pad or truncate the audio data to the target length
+    if target_length is not None:
+        if len(wav_data) < target_length:
+            pad_length = target_length - len(wav_data)
+            wav_data = np.pad(wav_data, (0, pad_length), mode='constant')
+        elif len(wav_data) > target_length:
+            wav_data = wav_data[:target_length]
     
     return wav_data
 
@@ -398,7 +381,7 @@ def preprocess_audio_file(filepath, target_length=None):
 def load_data(data_dir, label, target_length=None):
     data = []
     labels = []
-    target_length = 80000
+    target_length = 16000
     for filename in os.listdir(data_dir):
         filepath = os.path.join(data_dir, filename)
         
@@ -429,8 +412,14 @@ from sklearn.model_selection import train_test_split
 
 # Divide los datos en conjuntos de entrenamiento y prueba
 train_data, test_data, train_labels, test_labels = train_test_split(all_data, all_labels, test_size=0.2, random_state=42)
-train_data = np.array(train_data, dtype=np.float32)
-train_labels = np.array(train_labels, dtype=np.int32)
+# train_data = np.array(train_data)
+# train_labels = np.array(train_labels)
 
+from keras.utils import to_categorical
+train_labels = to_categorical(train_labels, num_classes=2)
+train_labels_binary = np.argmax(train_labels, axis=1)
+train_labels_binary = train_labels_binary.reshape(-1, 1)
 print(train_data.shape)
-yamnet_scream_detection_model.fit(train_data, train_labels, epochs=20, batch_size=64, validation_split=0.1)
+print(train_labels_binary.shape)
+
+# yamnet_scream_detection_model.fit(train_data, train_labels_binary, epochs=1, batch_size=32, validation_split=0.1)
