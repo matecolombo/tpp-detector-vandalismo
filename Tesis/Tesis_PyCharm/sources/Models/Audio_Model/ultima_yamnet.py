@@ -189,7 +189,7 @@ base_model = keras.applications.MobileNetV2(
 base_model.trainable = False
 
 # Create new model on top
-inputs = keras.Input(shape=(1249, 129, 3))
+inputs = keras.Input(shape=input_shape)
 x = inputs
 
 x = preprocessing.Resizing(32, 32)(x)
