@@ -29,9 +29,11 @@ class Params:
     mel_bands: int = 64
     mel_min_hz: float = 125.0
     mel_max_hz: float = 7500.0
+    expected_waveform_length: int = 32000
     log_offset: float = 0.001
     patch_window_seconds: float = 0.96
     patch_hop_seconds: float = 0.48
+    max_duration_seconds: int = 10
 
     @property
     def patch_frames(self):
